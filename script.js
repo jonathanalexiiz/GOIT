@@ -11,7 +11,7 @@ let citas = [
 		id: 2,
 		paciente: "Juan Pérez Martínez",
 		doctor: "Dra. Sánchez",
-		fechaHora: "2025-06-15T10:30:00",
+		fechaHora: new Date(2025, 5, 15, 10, 30),
 		duracion: 45,
 		estado: "Confirmada",
 	},
@@ -19,7 +19,7 @@ let citas = [
 		id: 3,
 		paciente: "Ana Torres Ruiz",
 		doctor: "Dr. Rodríguez",
-		fechaHora: 1750071600000,
+		fechaHora: new Date(2025, 5, 15, 11, 0),
 		duracion: 60,
 		estado: "Confirmada",
 	},
@@ -27,7 +27,7 @@ let citas = [
 		id: 4,
 		paciente: "Carlos Mendoza",
 		doctor: "Dr. López",
-		fechaHora: "06/15/2025 14:00",
+		fechaHora: new Date(2025, 5, 15, 14, 0),
 		duracion: 30,
 		estado: "Confirmada",
 	},
@@ -43,11 +43,12 @@ let citas = [
 		id: 6,
 		paciente: "Roberto Fernández",
 		doctor: "Dr. Rodríguez",
-		fechaHora: "2024-02-20T16:00:00",
+		fechaHora: new Date(2024, 1, 20, 16, 0),
 		duracion: 30,
 		estado: "Confirmada",
 	},
 ];
+
 
 let contadorId = 7;
 
@@ -59,23 +60,18 @@ const doctores = [
 ];
 
 function formatearFecha(fecha) {
-	let fechaObj;
-
-	if (fecha instanceof Date) {
-		fechaObj = fecha;
-	} else if (typeof fecha === "number") {
-		fechaObj = new Date(fecha);
-	} else if (typeof fecha === "string") {
-		fechaObj = new Date(fecha);
+	if (!(fecha instanceof Date) || isNaN(fecha)) {
+		return "Fecha inválida";
 	}
 
-	const dia = fechaObj.getDate().toString().padStart(2, "0");
-	const mes = fechaObj.getMonth().toString().padStart(2, "0");
-	const año = fechaObj.getFullYear();
-	const hora = fechaObj.getHours().toString().padStart(2, "0");
-	const minutos = fechaObj.getMinutes().toString().padStart(2, "0");
-
-	return `${dia}/${mes}/${año} - ${hora}:${minutos}`;
+	return new Intl.DateTimeFormat("es-ES", {
+		day: "2-digit",
+		month: "2-digit",
+		year: "numeric",
+		hour: "2-digit",
+		minute: "2-digit",
+		hour12: false
+	}).format(fecha);
 }
 
 function formatearHora(fecha) {
@@ -86,26 +82,29 @@ function formatearHora(fecha) {
 }
 
 function verificarConflicto(nuevaCita) {
-	const nuevaFecha =
-		nuevaCita.fechaHora instanceof Date
-			? nuevaCita.fechaHora
-			: new Date(nuevaCita.fechaHora);
+	const inicioNueva = nuevaCita.fechaHora;
+	const finNueva = new Date(inicioNueva);
+	finNueva.setMinutes(finNueva.getMinutes() + nuevaCita.duracion);
 
 	for (const cita of citas) {
 		if (cita.doctor !== nuevaCita.doctor) continue;
+		if (cita.estado !== "Confirmada") continue;
 
-		if (cita.estado === "Expirada") continue;
+		const inicioExistente = cita.fechaHora;
+		const finExistente = new Date(inicioExistente);
+		finExistente.setMinutes(
+			finExistente.getMinutes() + cita.duracion
+		);
 
-		const citaExistente =
-			cita.fechaHora instanceof Date
-				? cita.fechaHora
-				: new Date(cita.fechaHora);
+		const haySolapamiento =
+			inicioNueva < finExistente &&
+			finNueva > inicioExistente;
 
-		if (citaExistente.getTime() === nuevaFecha.getTime()) {
+		if (haySolapamiento) {
 			return {
 				hayConflicto: true,
 				citaConflicto: cita,
-				mensaje: `Conflicto: ${cita.doctor} ya tiene una cita a esa hora exacta con ${cita.paciente}`,
+				mensaje: `Conflicto: ${cita.doctor} ya tiene una cita desde ${formatearHora(inicioExistente)} hasta ${formatearHora(finExistente)}`
 			};
 		}
 	}
@@ -174,14 +173,16 @@ function cancelarCita(id) {
 }
 
 function cancelarCitasPasadas() {
-	console.log(
-		"Función cancelarCitasPasadas() pendiente de implementación completa",
-	);
-
-	const ahora = Date.now();
+	const ahora = new Date();
 
 	citas.forEach((cita) => {
-		if (cita.fechaHora < ahora && cita.estado === "Confirmada") {
+		if (cita.estado !== "Confirmada") return;
+
+		const inicio = cita.fechaHora;
+		const fin = new Date(inicio);
+		fin.setMinutes(fin.getMinutes() + cita.duracion);
+
+		if (fin <= ahora) {
 			cita.estado = "Expirada";
 		}
 	});
